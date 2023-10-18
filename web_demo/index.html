@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam with ONNX</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxjs/dist/onnx.min.js"></script>
+
+</head>
+<body>
+    <video id="webcam" autoplay playsinline width="280" height="280"></video>
+    <canvas id="transformed" width="28" height="28"></canvas>
+    <button id="switch-camera">Switch Camera</button>
+    <div id="plotly-histogram" style="width: 90%; margin: 0 auto;"></div>
+    <script src="script.js"></script>
+</body>
+</html>
