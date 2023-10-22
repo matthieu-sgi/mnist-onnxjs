@@ -1,16 +1,28 @@
-
 body {
-    font-family: 'Arial', sans-serif;
+    font-family: Arial, sans-serif;
     text-align: center;
-    margin-top: 50px;
 }
 
-video {
-    border: 1px solid #000;
-    margin-bottom: 20px;
+#webcam {
+    width: 100%;
+    max-width: 480px;
+    border: solid 5px transparent;
+    position: relative;
+    background-color: black;
+}
+
+#webcam::after {
+    content: "";
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 280px;
+    height: 280px;
+    transform: translate(-50%, -50%);
+    border: 2px solid red;
 }
 
 button {
-    padding: 10px 20px;
-    font-size: 16px;
+    margin-top: 20px;
 }

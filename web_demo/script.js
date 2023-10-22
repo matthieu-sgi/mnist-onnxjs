@@ -1,113 +1,249 @@
-const CANVAS_SIZE = 28;
-let isPlotInitialized = false;
+const video = document.getElementById('webcam');
+const switchCamBtn = document.getElementById('switchCam');
+let currentStream;
+let model;
 
+// Initialize the plot
+const initialData = [{
+    y: Array(10).fill(0),  // Assuming 10 logits for MNIST
+    type: 'bar'           // Specify the type as 'bar'
+}];
+Plotly.newPlot('logitsGraph', initialData);
 
-const webcamElement = document.getElementById('webcam');
-const switchCameraButton = document.getElementById('switch-camera');
-const sess = new onnx.InferenceSession();
-
-// Store all available video devices
-let videoDevices = [];
-let currentDeviceIndex = 0;
-
-// Load the ONNX model
-const loadingModelPromise = sess.loadModel('./onnx_model.onnx');
-
-// Initialize the webcam stream
-navigator.mediaDevices.enumerateDevices().then(devices => {
-    videoDevices = devices.filter(device => device.kind === 'videoinput');
-    startWebcamStream(videoDevices[currentDeviceIndex].deviceId);
-});
-
-switchCameraButton.addEventListener('click', () => {
-    currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-    startWebcamStream(videoDevices[currentDeviceIndex].deviceId);
-});
-
-function startWebcamStream(deviceId) {
-    navigator.mediaDevices.getUserMedia({
-        video: { deviceId: deviceId }
-    }).then(stream => {
-        webcamElement.srcObject = stream;
-        webcamElement.play();
-    }).catch(error => {
-        console.error('Error accessing the webcam:', error);
-    });
+// Initialize ONNX model
+async function initModel() {
+    model = new onnx.InferenceSession({ backendHint: 'webgl' });
+    await model.loadModel('./onnx_model.onnx');
 }
 
-function reshapeFloat32ArrayToUint8ClampedArray(inputArray) {
-    const outputArray = new Uint8ClampedArray(inputArray.length);
-    
-    for (let i = 0; i < inputArray.length; i++) {
-        // Convert the float value to the 0-255 range
-        const clampedValue = Math.min(255, Math.max(0, Math.round(inputArray[i] * 255)));
-        outputArray[i] = clampedValue;
+// Get webcam access
+async function getWebcam(streamName = 'user') {
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
     }
 
-    return outputArray;
-}
-
-function preprocessFrame(videoElement) {
-    const canvas = document.createElement('canvas');
-    const imga = document.getElementById('transformed');
-    canvas.width = CANVAS_SIZE; // 28
-    canvas.height = CANVAS_SIZE; // 28
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(videoElement, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    const imageData = ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    const inputData = new Float32Array(1 * 28 * 28);
-    console.log(imageData.data.length);
-    for (let i = 0; i < imageData.data.length; i += 4) {
-        inputData[i / 4] = ((imageData.data[i] / 255.0) - 0.1307)/0.3081;
-    }
-
-    // Display input data on the webpage
-    const ctx_2 = imga.getContext('2d');
-    // ctx_2.(imageData, 0, 0);
-    // InputData is a float32 Array and has to be reshaped to a Uint8ClampedArray
-    const reshaped_inputImage = reshapeFloat32ArrayToUint8ClampedArray(inputData);
-    ctx_2.putImageData(reshaped_inputImage, 0, 0);
-
-    // imga.putImageData(imageData, 0, 0);
-    // document.body.appendChild(imga);
-    // const ctx_2 = canvas_2.getContext('2d');
-
-    console.log(inputData)
-    return new onnx.Tensor(inputData, 'float32', [1, 1, 28, 28]);
-}
-
-async function processWebcamFrame() {
-    if (webcamElement.readyState === webcamElement.HAVE_ENOUGH_DATA) {
-        const input = preprocessFrame(webcamElement);
-        const startTime = performance.now();
-        const outputMap = await sess.run([input]);
-        const endTime = performance.now();
-
-        const elapsedTime = endTime - startTime;
-        const fps = 1000 / elapsedTime;
-        console.log(`Frame processed in ${elapsedTime.toFixed(2)} ms (${fps.toFixed(2)} FPS)`);
-
-        updateHistogram(outputMap.values().next().value.data);
-    }
-    requestAnimationFrame(processWebcamFrame);
-}
-
-
-function updateHistogram(predictions) {
-    const trace = {
-        x: Array.from({ length: 10 }, (_, i) => i),
-        y: predictions,
-        type: 'bar'
+    const constraints = {
+        video: {
+            facingMode: streamName
+        }
     };
-    
-    if (!isPlotInitialized) {
-        Plotly.newPlot('plotly-histogram', [trace]);
-        isPlotInitialized = true;
-    } else {
-        Plotly.update('plotly-histogram', { y: [predictions] });
-    }
+
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = currentStream;
+
+    video.onloadedmetadata = function() {
+        video.play();
+        inferenceLoop();
+    };
 }
 
-loadingModelPromise.then(() => {
-    processWebcamFrame();
+
+const three =  new onnx.Tensor(
+    [-0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000,  0.1902,  0.4922,  0.4922,  0.4922,  0.1824,
+     0.1902,  0.3078, -0.0569, -0.0569, -0.0569, -0.0529, -0.4529,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.1902,  0.4922,  0.4882,  0.4882,  0.4882,  0.4882,
+     0.4922,  0.4882,  0.4882,  0.4882,  0.4882,  0.4922,  0.3941,
+     0.1863, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000,  0.3706,  0.1039, -0.2843, -0.2843, -0.2843,
+    -0.0333,  0.0804,  0.1471,  0.2647,  0.2647,  0.4922,  0.4882,
+     0.4373,  0.1863, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.3510, -0.4647, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,  0.1824,  0.4882,
+     0.4882,  0.0059, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.4373,  0.0490,  0.4922,  0.4882,
+     0.3627, -0.3549, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.0529, -0.3941, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.2529, -0.1510,  0.3118,  0.4922,  0.5000,  0.3431,
+    -0.0686, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.4529, -0.4882, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.4608, -0.1667,
+     0.0765,  0.4412,  0.4647,  0.4882,  0.4882,  0.1588, -0.3706,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.3000,  0.1510,  0.2961,  0.4882,
+     0.4922,  0.4137,  0.2647, -0.1000, -0.2843, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000,  0.1627,  0.4529,  0.4882,  0.4882,  0.4882,
+     0.2451, -0.2686, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000,  0.4922,  0.4882,  0.4882,  0.4882,  0.4882,
+     0.4922,  0.0961, -0.3784, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.2529,  0.4451,  0.4922,  0.4922,  0.4922,
+     0.5000,  0.4922,  0.3706, -0.1039, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.4059, -0.2686,  0.1549,  0.3392,
+     0.4922,  0.4882,  0.4882,  0.4765, -0.1078, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.3784,
+    -0.2804,  0.2804,  0.4882,  0.4882,  0.3667, -0.3745, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.3902,  0.2804,  0.4882,  0.4882,  0.0490, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.2765,  0.4882,  0.4882,  0.0490, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.1039,  0.1510,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.3510,  0.3706,  0.4922,  0.4922,  0.0529, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,  0.3824,  0.3392,
+    -0.3902, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.3118,
+     0.0765,  0.4176,  0.4882,  0.4882,  0.3000, -0.4412, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,  0.3824,  0.4882,
+     0.3431,  0.2725,  0.0294, -0.0922,  0.2725,  0.2725,  0.3902,
+     0.4922,  0.4882,  0.4882,  0.4882, -0.0608, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.0216,  0.4647,
+     0.4882,  0.4882,  0.4922,  0.4882,  0.4882,  0.4882,  0.4882,
+     0.4922,  0.4882,  0.4608,  0.0059, -0.3549, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.1549,
+     0.0020,  0.4882,  0.4922,  0.4882,  0.4882,  0.4882,  0.4882,
+     0.2451, -0.0608, -0.1588, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+   -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000,
+    -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000, -0.5000], 'float32', [1, 1, 28, 28])
+
+function preprocessFrame() {
+    // Get video element
+    const video = document.getElementById('webcam');
+
+    // Create a temporary canvas to capture a frame from the video
+    const captureCanvas = document.createElement('canvas');
+    captureCanvas.width = video.videoWidth;
+    captureCanvas.height = video.videoHeight;
+    const captureCtx = captureCanvas.getContext('2d');
+    captureCtx.drawImage(video, 0, 0);
+
+    // const imageData = captureCtx.getImageData(video.videoWidth / 2 - 140, video.videoHeight / 2 - 140, 280, 280);
+
+    // Create an off-screen canvas for resizing
+    const resizeCanvas = document.createElement('canvas');
+    resizeCanvas.width = 28;
+    resizeCanvas.height = 28;
+    const resizeCtx = resizeCanvas.getContext('2d');
+
+    resizeCtx.drawImage(captureCanvas, video.videoWidth / 2 - 140, video.videoHeight / 2 - 140, 280, 280, 0, 0, 28, 28);
+
+    // Get resized image data
+    const resizedImageData = resizeCtx.getImageData(0, 0, 28, 28);
+
+    // Convert to grayscale & normalize
+    const input = new Float32Array(28 * 28);
+    for(let i = 0; i < 28; i++) {
+        for(let j = 0; j < 28; j++) {
+            const idx = i * 28 + j;
+            const r = resizedImageData.data[idx * 4];
+            const g = resizedImageData.data[idx * 4 + 1];
+            const b = resizedImageData.data[idx * 4 + 2];
+            var grayscaleValue = ((0.299 * r + 0.587 * g + 0.114 * b)/255);
+            // grayscaleValue = grayscaleValue > 0.5 ? 1 : 0;
+            //  use a sigmoid
+            // grayscaleValue = 1/(1+Math.exp(-2.0*grayscaleValue));
+
+            // input[idx] = 1/(1+Math.exp(-4.0*(grayscaleValue-0.5)));
+            input[idx] =(grayscaleValue-0.5);
+                
+
+            // Set the grayscaled value to the imageData for display
+            resizedImageData.data[idx * 4] = grayscaleValue*255;
+            resizedImageData.data[idx * 4 + 1] = grayscaleValue*255;
+            resizedImageData.data[idx * 4 + 2] = grayscaleValue*255;
+            resizedImageData.data[idx * 4 + 3] = 255; // Alpha channel
+        }
+    }
+    // Display the grayscaled and resized image on the actual canvas in the HTML
+    const displayCanvas = document.getElementById('grayscaleCanvas');
+    const displayCtx = displayCanvas.getContext('2d');
+    displayCtx.putImageData(resizedImageData, 0, 0);
+    // console.log(input)
+    // console.log(three)
+    const output_tensor = new onnx.Tensor(input, 'float32', [1, 1, 28, 28])
+    // console.log(output_tensor)
+    mean=0
+    for (let i = 0; i < input.length; i++) {
+        mean += input[i];
+    }
+    mean /= input.length;
+    console.log(Math.max(...input), Math.min(...input), mean)
+    return output_tensor;
+}
+
+
+
+
+// Inference loop
+async function inferenceLoop() {
+    // const ctx = video.getContext('2d');
+    const tensorInput = preprocessFrame();
+    const output = await model.run([tensorInput]);
+
+    // Process logits & plot
+    const logits = output.values().next().value.data;
+    const updatedData = [{ y: logits , type: 'bar'}];
+    Plotly.react('logitsGraph', updatedData);
+
+    const now = Date.now();
+    const fps = 1000 / (now - (window.lastInferenceTime || now));
+    window.lastInferenceTime = now;
+    console.log(`FPS: ${fps.toFixed(2)}, logits: ${logits}`);
+
+    requestAnimationFrame(inferenceLoop);
+}
+
+switchCamBtn.addEventListener('click', () => {
+    const facingMode = video.srcObject.getVideoTracks()[0].getSettings().facingMode;
+    getWebcam(facingMode === 'user' ? 'environment' : 'user');
+});
+
+initModel().then(() => {
+    getWebcam();
 });

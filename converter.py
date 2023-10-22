@@ -10,13 +10,13 @@ if __name__ == "__main__":
     model.eval()
     model.to('cpu')
     example = torch.rand(1, 1, 28, 28)
-    traced_script_module = torch.jit.trace(model, example)
-    traced_script_module.save("mnist_cnn.pt")
+    # traced_script_module = torch.jit.trace(model, example)
+    # traced_script_module.save("mnist_cnn.pt")
 
     #Export to ONNX
     torch.onnx.export(model,
                       example,
-                      "onnx_model.onnx",
+                      "./web_demo/onnx_model.onnx",
                       verbose=True,
                       input_names=['input'],
                       output_names=['output'],
@@ -25,5 +25,8 @@ if __name__ == "__main__":
                       export_params=True,
                       dynamic_axes={'input': {0: 'batch_size'},
                                     'output': {0: 'batch_size'}})
+    onnx_model = onnx.load("./web_demo/onnx_model.onnx")
+    onnx.checker.check_model(onnx_model)
     
     # Compare torch model to onnx model
+    import comparator
