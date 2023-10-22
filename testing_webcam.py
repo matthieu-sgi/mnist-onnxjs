@@ -4,14 +4,13 @@ import onnxruntime
 import torchvision.transforms as transforms
 import cv2
 import numpy as np
-from mnist import MnistModelCNN
+# from mnist import MnistModelCNN
 
-torch_model = MnistModelCNN()
-torch_model.load_state_dict(torch.load('best_model.pt'))
 
 # Step 1: Load the ONNX model
 onnx_model_path = "./web_demo/onnx_model.onnx"
 onnx_model = onnx.load(onnx_model_path)
+ort_session = onnxruntime.InferenceSession(onnx_model_path)
 
 # Step 2: Set up webcam capture
 cap = cv2.VideoCapture(0)
@@ -50,13 +49,13 @@ while True:
     # print(processed_image)
 
     # Step 3: Run inference on the image using the ONNX model
-    output = torch_model(processed_image)
-    output = output.squeeze().detach().cpu().numpy()
+    ort_inputs = {ort_session.get_inputs()[0].name: processed_image.numpy()}
+    ort_outs = ort_session.run(None, ort_inputs)
+    output = ort_outs[0].squeeze()
+    # output = output.squeeze().detach().cpu().numpy()
     print(output.argmax())
-    # ort_session = onnxruntime.InferenceSession(onnx_model_path)
-    # ort_inputs = {ort_session.get_inputs()[0].name: processed_image.detach().cpu().numpy()}
-    # ort_outs = ort_session.run(None, ort_inputs)
-    # output = ort_outs[0].squeeze()
+    
+    
 
     # Display the model's output as a bar chart using OpenCV
     output_frame = np.zeros_like(frame)

@@ -12,7 +12,6 @@ if __name__ == "__main__":
     example = torch.rand(1, 1, 28, 28)
     # traced_script_module = torch.jit.trace(model, example)
     # traced_script_module.save("mnist_cnn.pt")
-
     #Export to ONNX
     torch.onnx.export(model,
                       example,
@@ -20,7 +19,7 @@ if __name__ == "__main__":
                       verbose=True,
                       input_names=['input'],
                       output_names=['output'],
-                      opset_version=11,
+                    #   opset_version=11,
                       do_constant_folding=True,
                       export_params=True,
                       dynamic_axes={'input': {0: 'batch_size'},
