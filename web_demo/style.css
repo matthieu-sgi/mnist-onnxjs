@@ -1,16 +1,57 @@
 
-body {
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
     font-family: 'Arial', sans-serif;
-    text-align: center;
-    margin-top: 50px;
 }
 
-video {
-    border: 1px solid #000;
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f4f4f4;
+}
+
+#webcam {
+    width: 100%; 
+    max-width: 640px; 
+    border: 3px solid #333;
+    border-radius: 5px;
     margin-bottom: 20px;
 }
 
-button {
+#switchCam {
     padding: 10px 20px;
-    font-size: 16px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: background-color 0.3s;
+}
+
+#switchCam:hover {
+    background-color: #555;
+}
+
+#grayscaleCanvas {
+    border: 2px solid #999;
+    margin-bottom: 20px;
+}
+
+#prediction {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+#logitsGraph {
+    width: 100%;
+    max-width: 640px;
+    height: 300px;
 }
